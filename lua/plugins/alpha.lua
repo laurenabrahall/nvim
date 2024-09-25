@@ -13,7 +13,6 @@ return {
     config = function()
       local alpha = require("alpha")
       local dashboard = require("alpha.themes.dashboard")
-      local persistence = require("persistence")
 
       dashboard.section.header.val = {
         [[                                                                       ]],
@@ -36,7 +35,7 @@ return {
       dashboard.section.buttons.val = {
         dashboard.button("f", " " .. " Find file", ":Telescope find_files <CR>"),
         dashboard.button("r", " " .. " Recent files", ":Telescope oldfiles <CR>"),
-        dashboard.button("s", " " .. " Restore Session", "<cmd>lua require('persistence').load()<cr>"),
+        dashboard.button("s", " " .. " Restore Session", "<cmd>lua require('persistence').load() <CR>"),
         dashboard.button("c", " " .. " Config", ":e ~/.config/nvim/ <CR>"),
         dashboard.button("q", " " .. " Quit", ":qa<CR>"),
       }
