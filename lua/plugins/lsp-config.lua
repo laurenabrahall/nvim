@@ -1,4 +1,5 @@
 return {
+
   {
     "williamboman/mason.nvim",
     lazy = false,
@@ -9,58 +10,131 @@ return {
   {
     "williamboman/mason-lspconfig.nvim",
     lazy = false,
-    config = function()
-      require("mason-lspconfig").setup({
-        auto_install = true,
-      })
-    end,
+    opts = {
+      auto_install = true,
+    },
   },
+
   {
     "neovim/nvim-lspconfig",
-    lazy = false,
+    event = { "BufReadPre", "BufNewFile" },
+    dependencies = {
+      { "williamboman/mason.nvim", config = true },
+      "williamboman/mason-lspconfig.nvim",
+      { "j-hui/fidget.nvim", opts = {} },
+      { "b0o/schemastore.nvim" },
+      { "hrsh7th/cmp-nvim-lsp" },
+    },
     config = function()
+      require("lspconfig.ui.windows").default_options.border = "single"
+
       local lspconfig = require("lspconfig")
-      local capabilities = require('cmp_nvim_lsp').default_capabilities()
+      local capabilities = require("cmp_nvim_lsp").default_capabilities()
       lspconfig.lua_ls.setup({
-        capabilities = capabilities
+        capabilities = capabilities,
       })
 
       lspconfig.html.setup({
-        capabilities = capabilities
+        capabilities = capabilities,
       })
 
-      vim.keymap.set("n", "<space>e", vim.diagnostic.open_float)
-      vim.keymap.set("n", "[d", vim.diagnostic.goto_prev)
-      vim.keymap.set("n", "]d", vim.diagnostic.goto_next)
-      vim.keymap.set("n", "<space>q", vim.diagnostic.setloclist)
+      lspconfig.jsonls.setup({
+        capabilities = capabilities,
+      })
+      lspconfig.ruby_lsp.setup({
+        capabilities = capabilities,
+      })
 
       vim.api.nvim_create_autocmd("LspAttach", {
-        group = vim.api.nvim_create_augroup("UserLspConfig", {}),
-        callback = function(ev)
-          -- Enable completion triggered by <c-x><c-o>
-          vim.bo[ev.buf].omnifunc = "v:lua.vim.lsp.omnifunc"
-          -- Buffer local mappings.
-          -- See `:help vim.lsp.*` for documentation on any of the below functions
-          local opts = { buffer = ev.buf }
-          vim.keymap.set("n", "gD", vim.lsp.buf.declaration, opts)
-          vim.keymap.set("n", "gd", vim.lsp.buf.definition, opts)
-          vim.keymap.set("n", "K", vim.lsp.buf.hover, opts)
-          vim.keymap.set("n", "gi", vim.lsp.buf.implementation, opts)
-          vim.keymap.set("n", "<C-k>", vim.lsp.buf.signature_help, opts)
-          vim.keymap.set("n", "<space>wa", vim.lsp.buf.add_workspace_folder, opts)
-          vim.keymap.set("n", "<space>wr", vim.lsp.buf.remove_workspace_folder, opts)
-          vim.keymap.set("n", "<space>wl", function()
-            print(vim.inspect(vim.lsp.buf.list_workspace_folders()))
-          end, opts)
-          vim.keymap.set("n", "<space>D", vim.lsp.buf.type_definition, opts)
-          vim.keymap.set("n", "<space>rn", vim.lsp.buf.rename, opts)
-          vim.keymap.set({ "n", "v" }, "<space>ca", vim.lsp.buf.code_action, opts)
-          vim.keymap.set("n", "gr", vim.lsp.buf.references, opts)
-          vim.keymap.set("n", "<space>f", function()
-            vim.lsp.buf.format({ async = true })
-          end, opts)
+        group = vim.api.nvim_create_augroup("lsp-attach", { clear = true }),
+        callback = function(event)
+          local map = function(keys, func, desc)
+            vim.keymap.set("n", keys, func, { buffer = event.buf, desc = "LSP: " .. desc })
+          end
+
+          map("gd", require("telescope.builtin").lsp_definitions, "Goto Definition")
+          map("gr", require("telescope.builtin").lsp_references, "Goto References")
+          map("gi", require("telescope.builtin").lsp_implementations, "Goto Implementation")
+          map("go", require("telescope.builtin").lsp_type_definitions, "Type Definition")
+          map("<leader>p", require("telescope.builtin").lsp_document_symbols, "Document Symbols")
+          map("<leader>P", require("telescope.builtin").lsp_workspace_symbols, "Workspace Symbols")
+          map("<leader>Ps", require("telescope.builtin").lsp_dynamic_workspace_symbols, "Workspace Symbols")
+
+          map("gl", vim.diagnostic.open_float, "Open Diagnostic Float")
+          map("K", vim.lsp.buf.hover, "Hover Documentation")
+          map("gs", vim.lsp.buf.signature_help, "Signature Documentation")
+          map("gD", vim.lsp.buf.declaration, "Goto Declaration")
+          map("<leader>ca", vim.lsp.buf.code_action, "Code Action")
+
+          map("<leader>v", "<cmd>vsplit | lua vim.lsp.buf.definition()<cr>", "Goto Definition in Vertical Split")
+
+          local wk = require("which-key")
+          wk.add({
+            { "<leader>la", vim.lsp.buf.code_action, desc = "Code Action" },
+            { "<leader>lA", vim.lsp.buf.range_code_action, desc = "Range Code Actions" },
+            { "<leader>ls", vim.lsp.buf.signature_help, desc = "Display Signature Information" },
+            { "<leader>lr", vim.lsp.buf.rename, desc = "Rename all references" },
+            { "<leader>lf", vim.lsp.buf.format, desc = "Format" },
+            { "<leader>li", require("telescope.builtin").lsp_implementations, desc = "Implementation" },
+            { "<leader>lw", require("telescope.builtin").diagnostics, desc = "Diagnostics" },
+
+            { "<leader>Wa", vim.lsp.buf.add_workspace_folder, desc = "Workspace Add Folder" },
+            { "<leader>Wr", vim.lsp.buf.remove_workspace_folder, desc = "Workspace Remove Folder" },
+            {
+              "<leader>Wl",
+              function()
+                print(vim.inspect(vim.lsp.buf.list_workspace_folders()))
+              end,
+              desc = "Workspace List Folders",
+            },
+          })
+
+          local client = vim.lsp.get_client_by_id(event.data.client_id)
+          if client and client.server_capabilities.documentHighlightProvider then
+            local highlight_augroup = vim.api.nvim_create_augroup("nvim-lsp-highlight", { clear = false })
+            vim.api.nvim_create_autocmd({ "CursorHold", "CursorHoldI" }, {
+              buffer = event.buf,
+              group = highlight_augroup,
+              callback = vim.lsp.buf.document_highlight,
+            })
+
+            vim.api.nvim_create_autocmd({ "CursorMoved", "CursorMovedI" }, {
+              buffer = event.buf,
+              group = highlight_augroup,
+              callback = vim.lsp.buf.clear_references,
+            })
+            vim.api.nvim_create_autocmd("LspDetach", {
+              group = vim.api.nvim_create_augroup("nvim-lsp-detach", { clear = true }),
+              callback = function(event2)
+                vim.lsp.buf.clear_references()
+                vim.api.nvim_clear_autocmds({ group = "nvim-lsp-highlight", buffer = event2.buf })
+              end,
+            })
+          end
         end,
       })
+
+      vim.diagnostic.config({
+        title = false,
+        underline = true,
+        virtual_text = true,
+        signs = true,
+        update_in_insert = false,
+        severity_sort = true,
+        float = {
+          source = "if_many",
+          style = "minimal",
+          border = "rounded",
+          header = "",
+          prefix = "",
+        },
+      })
+
+      local signs = { Error = " ", Warn = " ", Hint = "󰠠 ", Info = " " }
+      for type, icon in pairs(signs) do
+        local hl = "DiagnosticSign" .. type
+        vim.fn.sign_define(hl, { text = icon, texthl = hl, numhl = "" })
+      end
     end,
   },
 }
