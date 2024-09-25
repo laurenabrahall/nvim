@@ -8,16 +8,7 @@ return {
   },
   config = function()
     require("neo-tree").setup({})
-    vim.keymap.set("n", "<C-n>", ":Neotree toggle<CR>", {})
+    vim.keymap.set("n", "<C-n>", ":Neotree toggle<CR>", { desc = "Toggle Neotree" })
     vim.api.nvim_create_augroup("neotree", {})
-    --vim.api.nvim_create_autocmd("UiEnter", {
-     -- desc = "Open Neotree automatically",
-      --group = "neotree",
-      --callback = function()
-        --if vim.fn.argc() == 0 then
-         -- vim.cmd("Neotree toggle")
-        --end
-      --end,
-    --})
   end,
 }
